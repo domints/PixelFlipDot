@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pixel-flipdot"
+version = "0.0.2"
+authors = [
+  { name="domints", email="dominik@szymanski.io" },
+]
+description = "A simple Python package for driving Pixel Bydgoszcz flip-dot displays"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT License"}
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+  "pyserial"
+]
+[project.optional-dependencies]
+images = ["numpy", "pillow"]
+gpio = ["gpiozero"]
+
+[project.urls]
+Homepage = "https://github.com/domints/PixelFlipDot"
+Issues = "https://github.com/domints/PixelFlipDot/issues"
