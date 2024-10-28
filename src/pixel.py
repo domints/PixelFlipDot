@@ -129,7 +129,7 @@ class Pixel:
         resp = self.read_response()
         self.check_response(resp, displayNo)
 
-    def display_data_block(self, displayNo: int, block: str) -> str:
+    def display_data_block(self, displayNo: int, block: str) -> None:
         self.send_command(displayNo, 'DDB {}'.format(block))
         resp = self.read_response()
         self.check_response(resp, displayNo)
@@ -162,32 +162,51 @@ class Pixel:
                 raise ValueError("You need to pass either numpy array or PIL Image object")
             if imageData is None:
                 imageData = np.asarray(imageObj)
-            img = bytearray(b'\x00'*(columns*2))
-            for i in range(0, columns*16):
+            imgHeight = len(imageData)
+            if imgHeight == 0:
+                raise ValueError("You can't have no pixels.")
+            imgWidth = len(imageData[0])
+            if imgWidth == 0:
+                raise ValueError("You can't have no pixels in rows.")
+            pixelCount = imgHeight * imgWidth
+            byteCount = int(pixelCount / 8) + (1 if pixelCount % 8 > 0 else 0) # byte fits 8 pixels, if doesn't divide cleanly add byte for extra pixels
+            print(f'w: {imgWidth}, h: {imgHeight}, pc: {pixelCount}, bc: {byteCount}')
+            img = bytearray(b'\x00'*byteCount)
+            for i in range(0, pixelCount):
                 byteIx = int(i / 8)
-                bitIx = int(i % 8)
-                column = int(i / 16)
-                row = int(i % 16)
-                if row > 7:
-                    row = row - 8
-                else:
-                    row = row + 8
+                bitIx = 7 - int(i % 8)
+                # if bitIx > 7:
+                #     bitIx = bitIx - 8
+                column = int(i / imgHeight)
+                row = (imgHeight - 1) - int(i % imgHeight)
+                # HOW DOES BYTE SWAP WORK WITH NON-INTEGER DISPLAYS?
+                # if imgHeight % 8 == 0:
+                #     if row > 7:
+                #         row = row - 8
+                #     else:
+                #         row = row + 8
                 pxl = 1
                 if row < len(imageData) and column < len(imageData[row]):
-                        pxl = imageData[row][column]
+                        pxl_dt = imageData[row][column]
+                        if isinstance(pxl_dt, bool) or isinstance(pxl_dt, np.bool):
+                            pxl = 1 if pxl_dt else 0
+                        else:
+                            pxl = pxl_dt
                 try:
                     img[byteIx] = self._set_bit(img[byteIx], bitIx) if (pxl[0] > 0 if not invert else pxl[0] == 0) else self._clear_bit(img[byteIx], bitIx)
                 except:
                     img[byteIx] = self._set_bit(img[byteIx], bitIx) if (pxl > 0 if not invert else pxl == 0) else self._clear_bit(img[byteIx], bitIx)
             base = bytearray(self.base_full)
-            dataSize = columns * 2
+            dataSize = byteCount
             crcSize = 2
             firstHdrSize = 13
             secondHdrSize = 6
+            setupByte = 0b00100000 | (imgHeight & 0x1F)
             base[0] = dataSize + crcSize + firstHdrSize
             base[7] = secondHdrSize + dataSize
             base[2] = page
-            base[12] = columns
+            base[11] = setupByte
+            base[12] = imgWidth
             return base + img
     
     def _set_bit(self, value, bit):
