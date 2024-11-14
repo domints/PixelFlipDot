@@ -6,6 +6,10 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased]
 
+## [0.0.4] - 2024-11-14
+* Improvement: Remove unnecessary print
+* Improvement: pin requirements to specific versions, as PIL already kicked me in the butt
+
 ## [0.0.3] - 2024-10-19
 
 ### Updates
