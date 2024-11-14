@@ -170,7 +170,6 @@ class Pixel:
                 raise ValueError("You can't have no pixels in rows.")
             pixelCount = imgHeight * imgWidth
             byteCount = int(pixelCount / 8) + (1 if pixelCount % 8 > 0 else 0) # byte fits 8 pixels, if doesn't divide cleanly add byte for extra pixels
-            print(f'w: {imgWidth}, h: {imgHeight}, pc: {pixelCount}, bc: {byteCount}')
             img = bytearray(b'\x00'*byteCount)
             for i in range(0, pixelCount):
                 byteIx = int(i / 8)
