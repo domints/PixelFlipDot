@@ -54,7 +54,7 @@ class Pixel:
         self.serial.flush()
         self.afterWrite()
 
-    def read_response(self, timeout: int = 3) -> bytes:
+    def read_response(self, timeout: float = 0.25) -> bytes:
         orig_timeout = self.serial.timeout
         self.serial.timeout = timeout
         result = self.serial.read_until(bytes([0x04]))
@@ -82,7 +82,7 @@ class Pixel:
         self.send_command(displayNo, command)
         respString: str = None
         while respString is None:
-            responseBytes = self.read_response()
+            responseBytes = self.read_response(timeout=2.0)
             respString = self.check_response(responseBytes, displayNo)
         return respString
 
@@ -243,7 +243,7 @@ class Pixel:
         self.serial.write([0x04])
         self.serial.flush()
         self.afterWrite()
-        resp = self.read_response()
+        resp = self.read_response(timeout=2.0)
         self.check_response(resp, displayNo)
 
     def gpio_set(self):
