@@ -6,6 +6,9 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased]
 
+## [0.0.5] - 2024-11-23
+* Improvement: Reduced timeout to something closer to what display needs to respond, to make it all more responsive in case of problems
+
 ## [0.0.4] - 2024-11-14
 * Improvement: Remove unnecessary print
 * Improvement: pin requirements to specific versions, as PIL already kicked me in the butt
