@@ -1,6 +1,7 @@
-import serial
 import time
 import struct
+
+from serialbase import SerialConnector
 
 noImages = False
 try:
@@ -11,48 +12,25 @@ except ModuleNotFoundError:
 
 class Pixel:
     base_full = bytes.fromhex('B7000001010001AE0000003054')
-    def __init__(self, serialPort: str, dePin: int | None = None) -> None:
-        self.portName = serialPort
-        if dePin is not None:
-            try:
-                from gpiozero import DigitalOutputDevice
-                from gpiozero.pins.native import NativeFactory
-            except:
-                raise ImportError('To use GPIO (in Rpi?) install gpiozero library')
-            self.dePin = DigitalOutputDevice(dePin, pin_factory=NativeFactory())
-            self.beforeWrite = self.gpio_set
-            self.afterWrite = self.gpio_reset
-        else:
-            self.beforeWrite = self.gpio_null
-            self.afterWrite = self.gpio_null
-        pass
+    def __init__(self, serialPort: SerialConnector) -> None:
+        self.serial = serialPort
 
     def open(self) -> bool:
-        self.serial = serial.Serial(self.portName, 4800, 8, 'E')
-        self.serial.timeout = 3
-        return self.serial.is_open
-
-    def send_space(self) -> None:
-        self.serial.write([0x20, 0x04])
-    
-    def send_dbl_space(self) -> None:
-        self.serial.write([0x20, 0x20, 0x04])
+        return self.serial.open()
 
     def send_command(self, displayNo: int, command: str) -> bool:
         if displayNo < 0 or displayNo > 7:
             raise ValueError('Display number is out of supported range (0-7)')
-        self.beforeWrite()
-        self.send_space()
+        self.serial.send_space()
         time.sleep(0.05)
         self.serial.write(b'_')
-        self.serial.write([0x01])
+        self.serial.write(bytes([0x01]))
         self.serial.write(b'2')
         self.serial.write(bytes([displayNo + 0x30]))
         self.serial.write(command.encode('utf-8'))
         self.serial.write(b'\r\n')
-        self.serial.write([0x04])
+        self.serial.write(bytes([0x04]))
         self.serial.flush()
-        self.afterWrite()
 
     def read_response(self, timeout: float = 0.25) -> bytes:
         orig_timeout = self.serial.timeout
@@ -87,9 +65,8 @@ class Pixel:
         return respString
 
     def set_validators_block(self, blocked: bool) -> None:
-        self.beforeWrite()
         for i in range(0, 3):
-            self.send_dbl_space()
+            self.serial.send_dbl_space()
             self.serial.write(b'__\x0100BLK')
             if blocked:
                 self.serial.write(b'01F1\r\n\x04')
@@ -97,7 +74,6 @@ class Pixel:
                 self.serial.write(b'0071\r\n\x04')
 
         self.serial.flush()
-        self.afterWrite()
 
 
     def get_factory_identification(self, displayNo: int) -> str:
@@ -152,6 +128,7 @@ class Pixel:
         datastr = data.hex().capitalize()
         crcstr = struct.pack('<H', crc).hex().upper()
         return datastr + crcstr
+    
     if not noImages:
         def get_image_data(self, imageData: np.ndarray = None, imageObj: Image = None, invert: bool = False, page: int = 0, columns: int = 84):
             if noImages:
@@ -218,7 +195,7 @@ class Pixel:
     def send_sat(self):
         '''Yeah, I don't know what it does either. It looks like it's important before sending table'''
         for i in range(0, 3):
-            self.send_dbl_space()
+            self.serial.send_dbl_space()
             self.serial.write(b'__\x0101SAT" 1"\r\n\x04')
             self.serial.flush()
 
@@ -229,29 +206,17 @@ class Pixel:
         self.check_response(resp, displayNo)
 
     def delete_all_pages(self, displayNo: int):
-        self.beforeWrite()
         self.send_sat()
         self.send_sat()
         self.send_sat()
-        self.send_space()
+        self.serial.send_space()
         self.serial.write(b'_')
-        self.serial.write([0x01])
+        self.serial.write(bytes([0x01]))
         self.serial.write(b'2')
         self.serial.write(bytes([displayNo + 0x30]))
         self.serial.write('DPM 01FF57'.encode('utf-8'))
         self.serial.write(b'\r\n')
-        self.serial.write([0x04])
+        self.serial.write(bytes([0x04]))
         self.serial.flush()
-        self.afterWrite()
         resp = self.read_response(timeout=2.0)
         self.check_response(resp, displayNo)
-
-    def gpio_set(self):
-        self.dePin.on()
-        pass
-
-    def gpio_reset(self):
-        self.dePin.off()
-
-    def gpio_null(self):
-        pass
