@@ -13,4 +13,4 @@ For usage look at: [PythonPixelBydgoszcz repo](https://github.com/domints/Python
 ### Note for meself
 
 To build and upload to pypi do:
-`rm -rf build && python -m build && python -m twine upload dist/*`
+`rm -rf build && rm -rf dist && (rm -rf src/*.egg-info || true) && python -m build && python -m twine upload dist/*`
