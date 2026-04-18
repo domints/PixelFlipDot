@@ -13,12 +13,10 @@ serial_port = 4196 # if waveshare eth
 
 ### END SETUP ^
 
-import sys
-sys.path.insert(1, '../src')
-from hwserial import HwSerial
-from pixel import Pixel
-from serialbase import SerialConnector
-from waveshareeth import WaveshareEthernet
+from pixel.hwserial import HwSerial
+from pixel.pixel import Pixel
+from pixel.serialbase import SerialConnector
+from pixel.waveshareeth import WaveshareEthernet
 
 serial: SerialConnector = None
 if serial_addr is not None and serial_port is not None:
@@ -28,6 +26,5 @@ else:
 
 pixel = Pixel(serial)
 pixel.open()
-gid = pixel.get_factory_identification(display_no)
 
 print(gid)

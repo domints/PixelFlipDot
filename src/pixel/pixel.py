@@ -1,5 +1,8 @@
+from enum import Enum
 import time
 import struct
+from typing import NamedTuple
+from warnings import deprecated
 
 from serialbase import SerialConnector
 
@@ -9,6 +12,17 @@ try:
     from PIL import Image
 except ModuleNotFoundError:
     noImages = True
+
+class RenderType(Enum):
+    Bitmap = 0
+    RunLengthEncoding = 1
+
+class ImagePartDefinition(NamedTuple):
+    image: np.ndarray | Image
+    invert: bool = False
+    offsetFromLeft: int = 0
+    offsetFromBottom: int = 0
+    renderAs: RenderType = RenderType.RunLengthEncoding
 
 class Pixel:
     base_full = bytes.fromhex('B7000001010001AE0000003054')
@@ -142,7 +156,26 @@ class Pixel:
         return datastr + crcstr
     
     if not noImages:
+        def get_pixel_val(pxl_raw, invert: bool = False):
+            pxl = 1
+            if isinstance(pxl_raw, bool) or isinstance(pxl_raw, np.bool):
+                pxl = 1 if pxl_raw else 0
+            else:
+                pxl = pxl_raw
+
+            result = True
+            try:
+                result = pxl[0] > 0 if not invert else pxl[0] == 0
+            except:
+                result = pxl > 0 if not invert else pxl == 0
+            
+            return result
+
+        @deprecated
         def get_image_data(self, imageData: np.ndarray = None, imageObj: Image = None, invert: bool = False, page: int = 0, columns: int = 84):
+            '''
+            Do not use, it's bad, some displays don't even understand those blocks. Use get_image_block instead.
+            '''
             if noImages:
                 raise ModuleNotFoundError("No image-related modules found. Please install Numpy and PIL.")
             if page > 0xff:
@@ -173,17 +206,13 @@ class Pixel:
                 #         row = row - 8
                 #     else:
                 #         row = row + 8
-                pxl = 1
+                pxl = True
                 if row < len(imageData) and column < len(imageData[row]):
-                        pxl_dt = imageData[row][column]
-                        if isinstance(pxl_dt, bool) or isinstance(pxl_dt, np.bool):
-                            pxl = 1 if pxl_dt else 0
-                        else:
-                            pxl = pxl_dt
-                try:
-                    img[byteIx] = self._set_bit(img[byteIx], bitIx) if (pxl[0] > 0 if not invert else pxl[0] == 0) else self._clear_bit(img[byteIx], bitIx)
-                except:
-                    img[byteIx] = self._set_bit(img[byteIx], bitIx) if (pxl > 0 if not invert else pxl == 0) else self._clear_bit(img[byteIx], bitIx)
+                    pxl_dt = imageData[row][column]
+                    pxl = self.get_pixel_val(pxl_dt, invert)
+
+                img[byteIx] = self._set_bit(img[byteIx], bitIx) if pxl else self._clear_bit(img[byteIx], bitIx)
+
             base = bytearray(self.base_full)
             dataSize = byteCount
             crcSize = 2
@@ -196,6 +225,169 @@ class Pixel:
             base[11] = setupByte
             base[12] = imgWidth
             return base + img
+        
+        def get_image_block(self, images: list[ImagePartDefinition], page: int = 0):
+            if noImages:
+                raise ModuleNotFoundError("No image-related modules found. Please install Numpy and PIL.")
+            if page > 16:
+                raise ValueError("You can only fit one byte in screen ID, I think...")
+            if len(images) == 0:
+                raise ValueError("You need to pass at least one image, either numpy array or PIL Image object")
+            
+            packetLength = 9 # base size of header + CRC, going to add images when they are rendered
+            header = bytearray(b'\x00'*7)
+            header[0] = 0x00 # space for low byte of packet length
+            header[1] = 0x00 # space for high byte of packet length
+            header[2] = page
+            header[3] = 0x01 # magic
+            header[4] = 0x03 # magic, sometimes can see also 01 or 05
+            header[5] = 0x00 # idk why
+            header[6] = 0x00 # img count
+
+            for imgPart in images:
+                partData: bytearray | None = None
+                if imgPart.renderAs == RenderType.Bitmap:
+                    partData = self.get_image_part_bitmap(imgPart.image, imgPart.invert, imgPart.offsetFromLeft, imgPart.offsetFromBottom)
+                elif imgPart.renderAs == RenderType.RunLengthEncoding:
+                    partData = self.get_image_part_rle(imgPart.image, imgPart.invert, imgPart.offsetFromLeft, imgPart.offsetFromBottom)
+                
+                if partData is not None:
+                    packetLength += len(partData)
+                    header += partData
+
+            header[0] = (packetLength) & 0xFF
+            header[1] = (packetLength) >> 8
+
+            return header
+        
+        def get_image_part_bitmap(self, imageData: np.ndarray | Image, invert: bool = False, offsetFromLeft: int = 0, offsetFromBottom: int = 0) -> bytearray:
+            if noImages:
+                raise ModuleNotFoundError("No image-related modules found. Please install Numpy and PIL.")
+            if imageData is None:
+                raise ValueError("You need to pass either numpy array or PIL Image object")
+            if imageData is Image:
+                imageData = np.asarray(imageData)
+            imgHeight = len(imageData)
+            if imgHeight == 0:
+                raise ValueError("You can't have no pixels.")
+            imgWidth = len(imageData[0])
+            if imgWidth == 0:
+                raise ValueError("You can't have no pixels in rows.")
+            pixelCount = imgHeight * imgWidth
+            byteCount = int(pixelCount / 8) + (1 if pixelCount % 8 > 0 else 0) # byte fits 8 pixels, if doesn't divide cleanly add byte for extra pixels
+            img = bytearray(b'\x00'*byteCount)
+            for i in range(0, pixelCount):
+                byteIx = int(i / 8)
+                bitIx = 7 - int(i % 8)
+                # if bitIx > 7:
+                #     bitIx = bitIx - 8
+                column = int(i / imgHeight)
+                row = (imgHeight - 1) - int(i % imgHeight)
+                # HOW DOES BYTE SWAP WORK WITH NON-INTEGER DISPLAYS?
+                # if imgHeight % 8 == 0:
+                #     if row > 7:
+                #         row = row - 8
+                #     else:
+                #         row = row + 8
+                pxl = True
+                if row < len(imageData) and column < len(imageData[row]):
+                    pxl_dt = imageData[row][column]
+                    pxl = self.get_pixel_val(pxl_dt, invert)
+
+                img[byteIx] = self._set_bit(img[byteIx], bitIx) if pxl else self._clear_bit(img[byteIx], bitIx)
+            
+            setupByte = 0b00100000
+            setupByte |= (imgHeight & 0b11111)
+
+            header = bytearray(b'\x00'*6)
+            header[0] = (byteCount + 6) & 0xFF
+            header[1] = (byteCount + 6) >> 8
+            header[2] = offsetFromLeft
+            header[3] = offsetFromBottom
+            header[4] = setupByte
+            header[5] = imgWidth
+        
+        def get_image_part_rle(self, imageData: np.ndarray | Image, invert: bool = False, page: int = 0, offsetFromLeft: int = 0, offsetFromBottom: int = 0) -> bytearray:
+            if noImages:
+                raise ModuleNotFoundError("No image-related modules found. Please install Numpy and PIL.")
+            if page > 0xff:
+                raise ValueError("You can only fit one byte in screen ID, I think...")
+            if imageData is None:
+                raise ValueError("You need to pass either numpy array or PIL Image object")
+            if imageData is Image:
+                imageData = np.asarray(imageData)
+            imgHeight = len(imageData)
+            if imgHeight == 0:
+                raise ValueError("You can't have no pixels.")
+            imgWidth = len(imageData[0])
+            if imgWidth == 0:
+                raise ValueError("You can't have no pixels in rows.")
+            pixelCount = imgHeight * imgWidth
+            maxByteCount = pixelCount / 2 # byte fits 8 pixels, if doesn't divide cleanly add byte for extra pixels
+            img = bytearray(b'\x00'*maxByteCount)
+
+            firstDot = False
+            lastBit = False
+            currCount = 1
+            currNibble = 0
+
+            x = 0
+            while x < imgWidth:
+                if x == 0:
+                    pxl_dt = imageData[0][0]
+                    firstDot = self.get_pixel_val(pxl_dt, invert)
+                    lastBit = firstDot
+                
+                y = imgHeight - 1
+                while y >= 0:
+                    pxl = self.get_pixel_val(imageData[y][x], invert)
+                    if pxl == lastBit:
+                        currCount += 1
+                    else:
+                        lastBit = pxl
+                        currNibble += self.rle_add_block(img, currCount)
+                        currCount = 1
+                    y -= 1
+
+                x += 1
+
+            if currCount > 0:
+                currNibble += self.rle_add_block(img, currCount, currNibble)
+            if currNibble % 2 == 1:
+                currNibble += 1
+
+            imgDataLength = currNibble / 2
+
+            setupByte = 0b10000000
+            setupByte |= (0b100000 if firstDot else 0x00)
+            setupByte |= (imgHeight & 0b11111)
+
+            header = bytearray(b'\x00'*6)
+            header[0] = (imgDataLength + 6) & 0xFF
+            header[1] = (imgDataLength + 6) >> 8
+            header[2] = offsetFromLeft
+            header[3] = offsetFromBottom
+            header[4] = setupByte
+            header[5] = imgWidth
+
+            return header + img[:imgDataLength]
+
+            
+        def rle_add_block(self, buffer: bytearray, currCount: int, currNibble: int) -> int:
+            addedNibbles = 0
+            while currCount > 15:
+                currNibble += 1
+                currCount -= 15
+                
+            if currCount == 0:
+                return addedNibbles
+            
+            if currNibble % 2 == 0:
+                buffer[currNibble / 2] |= (currCount << 4)
+            else:
+                buffer[currNibble / 2] |= (currCount & 0xf)
+
+            return addedNibbles + 1
     
     def _set_bit(self, value, bit):
         return value | (1<<bit)
