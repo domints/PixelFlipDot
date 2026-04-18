@@ -60,7 +60,7 @@ class Pixel:
         self.send_command(displayNo, command)
         respString: str = None
         while respString is None:
-            responseBytes = self.read_response(timeout=2.0)
+            responseBytes = self.read_response(timeout=5.0)
             respString = self.check_response(responseBytes, displayNo)
         return respString
 
@@ -88,11 +88,23 @@ class Pixel:
     def get_available_commands(self, displayNo: int) -> str:
         return self.read_string_command(displayNo, '#LC')
     
+    def get_light_sensor(self, displayNo: int) -> str:
+        return self.read_string_command(displayNo, 'GLS')
+    
+    def get_device_status(self, displayNo: int) -> str:
+        return self.read_string_command(displayNo, 'GDS')
+    
     def run_test(self, displayNo: int) -> str:
         return self.read_string_command(displayNo, '#TT')
     
     def run_display_show(self, displayNo: int) -> str:
         return self.read_string_command(displayNo, '#DS')
+    
+    def get_temperature(self, displayNo: int) -> str:
+        return self.read_string_command(displayNo, '#TM')
+    
+    def get_product_information(self, displayNo: int) -> str:
+        return self.read_string_command(displayNo, "PII")
     
     def set_one_pixel(self, displayNo: int, x: int, y: int, value: bool) -> None:
         '''Lol, doesn't work'''

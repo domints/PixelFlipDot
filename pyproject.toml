@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pixel-flipdot"
-version = "0.0.5"
+version = "0.0.6b1"
 authors = [
   { name="domints", email="dominik@szymanski.io" },
 ]
@@ -28,3 +28,6 @@ gpio = ["gpiozero==2.0.1"]
 [project.urls]
 Homepage = "https://github.com/domints/PixelFlipDot"
 Issues = "https://github.com/domints/PixelFlipDot/issues"
+
+[tool.setuptools]
+license-files = []

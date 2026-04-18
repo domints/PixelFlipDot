@@ -28,6 +28,6 @@ else:
 
 pixel = Pixel(serial)
 pixel.open()
-gid = pixel.get_gid(display_no)
+gid = pixel.get_factory_identification(display_no)
 
 print(gid)

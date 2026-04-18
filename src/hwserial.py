@@ -3,8 +3,9 @@ import serial
 from serialbase import SerialConnector
 
 class HwSerial(SerialConnector):
-    def __init__(self, portName: str, dePin: int | None = None) -> None:
+    def __init__(self, portName: str, dePin: int | None = None, baudRate: int = 4800) -> None:
         self.port = portName
+        self.baudRate = baudRate
         self.out_driving = False
         if dePin is not None:
             try:
@@ -21,7 +22,7 @@ class HwSerial(SerialConnector):
         pass
         
     def open(self) -> bool:
-        self.serial = serial.Serial(self.portName, 4800, 8, 'E')
+        self.serial = serial.Serial(self.portName, self.baudRate, 8, 'E')
         self.serial.timeout = 3
         return self.serial.is_open
     
@@ -48,3 +49,10 @@ class HwSerial(SerialConnector):
 
     def gpio_null(self):
         pass
+
+    def set_timeout(self, timeout: float):
+        self.timeout = timeout
+        self.serial.timeout = timeout
+
+    def get_timeout(self):
+        return self.serial.timeout
