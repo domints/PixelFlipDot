@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pixel-flipdot"
-version = "0.0.6b2"
+version = "0.0.6b3"
 authors = [
   { name="domints", email="dominik@szymanski.io" },
 ]
 description = "A simple Python package for driving Pixel Bydgoszcz flip-dot displays"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = "MIT"
 license-files = [ "LICENSE" ]
 classifiers = [

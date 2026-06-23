@@ -14,3 +14,5 @@ For usage look at: [PythonPixelBydgoszcz repo](https://github.com/domints/Python
 
 To build and upload to pypi do:
 `rm -rf build && rm -rf dist && (rm -rf src/*.egg-info || true) && python -m build && python -m twine upload dist/*`
+
+To run scripts in `test` dir you need to run `pip install -e .` in root, it'll create link in venv so it'll know to look ar the `root/src/pixel`

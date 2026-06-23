@@ -1,7 +1,7 @@
 import socket
 import time
 
-from serialbase import SerialConnector
+from pixel.serialbase import SerialConnector
 
 class WaveshareEthernet(SerialConnector):
     def __init__(self, address: tuple[int, int]):
@@ -24,6 +24,7 @@ class WaveshareEthernet(SerialConnector):
     def read_until(self, expected: bytes) -> bytes:
         start_time = time.time()
         while expected not in self.read_bfr:
+            self.socket.settimeout(self.timeout)
             read_data = self.socket.recv(16)
             self.read_bfr += read_data
             if time.time() - start_time > self.timeout:

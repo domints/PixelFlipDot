@@ -1,6 +1,6 @@
 import serial
 
-from serialbase import SerialConnector
+from pixel.serialbase import SerialConnector
 
 class HwSerial(SerialConnector):
     def __init__(self, portName: str, dePin: int | None = None, baudRate: int = 4800) -> None:

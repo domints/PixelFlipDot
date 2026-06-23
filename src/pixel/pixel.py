@@ -2,9 +2,13 @@ from enum import Enum
 import time
 import struct
 from typing import NamedTuple
-from warnings import deprecated
+try:
+    from warnings import deprecated
+except:
+    def deprecated(_):
+        pass
 
-from serialbase import SerialConnector
+from pixel.serialbase import SerialConnector
 
 noImages = False
 try:
@@ -18,7 +22,7 @@ class RenderType(Enum):
     RunLengthEncoding = 1
 
 class ImagePartDefinition(NamedTuple):
-    image: np.ndarray | Image
+    image: np.ndarray | Image.Image
     invert: bool = False
     offsetFromLeft: int = 0
     offsetFromBottom: int = 0
@@ -47,10 +51,10 @@ class Pixel:
         self.serial.flush()
 
     def read_response(self, timeout: float = 0.25) -> bytes:
-        orig_timeout = self.serial.timeout
-        self.serial.timeout = timeout
+        orig_timeout = self.serial.get_timeout()
+        self.serial.set_timeout(timeout)
         result = self.serial.read_until(bytes([0x04]))
-        self.serial.timeout = orig_timeout
+        self.serial.set_timeout(orig_timeout)
         return result
     
     def check_response(self, response: bytes, displayNo: int) -> str | None:
@@ -156,7 +160,7 @@ class Pixel:
         return datastr + crcstr
     
     if not noImages:
-        def get_pixel_val(pxl_raw, invert: bool = False):
+        def get_pixel_val(self, pxl_raw, invert: bool = False):
             pxl = 1
             if isinstance(pxl_raw, bool) or isinstance(pxl_raw, np.bool):
                 pxl = 1 if pxl_raw else 0
@@ -172,7 +176,7 @@ class Pixel:
             return result
 
         @deprecated
-        def get_image_data(self, imageData: np.ndarray = None, imageObj: Image = None, invert: bool = False, page: int = 0, columns: int = 84):
+        def get_image_data(self, imageData: np.ndarray = None, imageObj: Image.Image = None, invert: bool = False, page: int = 0, columns: int = 84):
             '''
             Do not use, it's bad, some displays don't even understand those blocks. Use get_image_block instead.
             '''
@@ -254,18 +258,19 @@ class Pixel:
                 if partData is not None:
                     packetLength += len(partData)
                     header += partData
+                    header[6] += 1
 
             header[0] = (packetLength) & 0xFF
             header[1] = (packetLength) >> 8
 
             return header
         
-        def get_image_part_bitmap(self, imageData: np.ndarray | Image, invert: bool = False, offsetFromLeft: int = 0, offsetFromBottom: int = 0) -> bytearray:
+        def get_image_part_bitmap(self, imageData: np.ndarray | Image.Image, invert: bool = False, offsetFromLeft: int = 0, offsetFromBottom: int = 0) -> bytearray:
             if noImages:
                 raise ModuleNotFoundError("No image-related modules found. Please install Numpy and PIL.")
             if imageData is None:
                 raise ValueError("You need to pass either numpy array or PIL Image object")
-            if imageData is Image:
+            if imageData is Image.Image:
                 imageData = np.asarray(imageData)
             imgHeight = len(imageData)
             if imgHeight == 0:
@@ -307,14 +312,14 @@ class Pixel:
             header[4] = setupByte
             header[5] = imgWidth
         
-        def get_image_part_rle(self, imageData: np.ndarray | Image, invert: bool = False, page: int = 0, offsetFromLeft: int = 0, offsetFromBottom: int = 0) -> bytearray:
+        def get_image_part_rle(self, imageData: np.ndarray | Image.Image, invert: bool = False, page: int = 0, offsetFromLeft: int = 0, offsetFromBottom: int = 0) -> bytearray:
             if noImages:
                 raise ModuleNotFoundError("No image-related modules found. Please install Numpy and PIL.")
             if page > 0xff:
                 raise ValueError("You can only fit one byte in screen ID, I think...")
             if imageData is None:
                 raise ValueError("You need to pass either numpy array or PIL Image object")
-            if imageData is Image:
+            if imageData is Image.Image:
                 imageData = np.asarray(imageData)
             imgHeight = len(imageData)
             if imgHeight == 0:
@@ -324,11 +329,11 @@ class Pixel:
                 raise ValueError("You can't have no pixels in rows.")
             pixelCount = imgHeight * imgWidth
             maxByteCount = pixelCount / 2 # byte fits 8 pixels, if doesn't divide cleanly add byte for extra pixels
-            img = bytearray(b'\x00'*maxByteCount)
+            img = bytearray(b'\x00'*int(maxByteCount))
 
             firstDot = False
             lastBit = False
-            currCount = 1
+            currCount = 0
             currNibble = 0
 
             x = 0
@@ -345,7 +350,7 @@ class Pixel:
                         currCount += 1
                     else:
                         lastBit = pxl
-                        currNibble += self.rle_add_block(img, currCount)
+                        currNibble += self.rle_add_block(img, currCount, currNibble)
                         currCount = 1
                     y -= 1
 
@@ -356,9 +361,9 @@ class Pixel:
             if currNibble % 2 == 1:
                 currNibble += 1
 
-            imgDataLength = currNibble / 2
+            imgDataLength = int(currNibble / 2)
 
-            setupByte = 0b10000000
+            setupByte = 0b01000000
             setupByte |= (0b100000 if firstDot else 0x00)
             setupByte |= (imgHeight & 0b11111)
 
@@ -383,9 +388,9 @@ class Pixel:
                 return addedNibbles
             
             if currNibble % 2 == 0:
-                buffer[currNibble / 2] |= (currCount << 4)
+                buffer[int(currNibble / 2)] |= (currCount << 4)
             else:
-                buffer[currNibble / 2] |= (currCount & 0xf)
+                buffer[int(currNibble / 2)] |= (currCount & 0xf)
 
             return addedNibbles + 1
     
