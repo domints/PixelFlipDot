@@ -1,3 +1,4 @@
+from __future__ import annotations
 from enum import Enum
 import time
 import struct
@@ -137,7 +138,7 @@ class Pixel:
 
     def display_data_block(self, displayNo: int, block: str) -> None:
         self.send_command(displayNo, 'DDB {}'.format(block))
-        resp = self.read_response()
+        resp = self.read_response(1.0)
         self.check_response(resp, displayNo)
 
     def get_crc16(self, data: bytes):

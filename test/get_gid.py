@@ -7,8 +7,7 @@ serial_gpio: int | None = None # if hw serial with gpio on rpi
 
 display_no: int = 7
 
-serial_addr = "10.12.10.196"
-#serial_addr = "10.42.76.80" # if waveshare eth
+serial_addr = "10.42.76.80" # if waveshare eth
 serial_port = 4196 # if waveshare eth
 
 ### END SETUP ^
