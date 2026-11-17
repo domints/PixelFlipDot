@@ -28,7 +28,7 @@ serial: SerialConnector = None
 if serial_addr is not None and serial_port is not None:
     serial = WaveshareEthernet((serial_addr, serial_port))
 else:
-    serial = HwSerial(serial_name, serial_gpio)
+    serial = HwSerial(serial_name, de_pin=serial_gpio)
 
 pixel = Pixel(serial)
 pixel.open()
