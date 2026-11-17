@@ -87,8 +87,8 @@ class Pixel:
         if displayNo < 0 or displayNo > 15:
             raise ValueError('Display number is out of supported range (0-15)')
         startIx = response.index(0x02)
-        displayNoTxt = '%X' % displayNo
-        if chr(response[startIx + 2]) != displayNoTxt:
+        displayNoByte = (b'%X' % displayNo)[0]
+        if response[startIx + 2] != displayNoByte:
             return None
         
         errCode = int(response[startIx + 8:startIx + 10].decode(), base=16)
@@ -481,7 +481,7 @@ class Pixel:
         self.serial.write(b'_')
         self.serial.write(bytes([0x01]))
         self.serial.write(b'2')
-        self.serial.write(bytes([displayNo + 0x30]))
+        self.serial.write(b'%X' % displayNo)
         self.serial.write('DPM 01FF57'.encode('utf-8'))
         self.serial.write(b'\r\n')
         self.serial.write(bytes([0x04]))
